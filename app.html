@@ -357,12 +357,24 @@
       margin-bottom: 6px;
     }
 
+    .fretboard.lefty .string-row,
+    .fretboard.lefty .fret-number-row {
+      grid-template-columns: repeat(13, minmax(38px, 1fr)) 44px;
+    }
+
     .string-label {
       text-align: right;
       padding-right: 8px;
       color: var(--text-muted);
       font-weight: 600;
       font-size: 0.9rem;
+    }
+
+    .fretboard.lefty .string-label,
+    .fretboard.lefty .fret-number-spacer {
+      text-align: left;
+      padding-right: 0;
+      padding-left: 8px;
     }
 
     /* Fret number header row */
@@ -949,19 +961,34 @@
       fretboard.innerHTML = "";
 
       const namingSet = state.useFlats ? FLATS : SHARPS;
-      const strings = state.leftHanded ? [...STANDARD_TUNING].reverse() : STANDARD_TUNING;
+      const strings = STANDARD_TUNING; // Always keep string order low → high for correct gauge thickness
       const fretMarkers = new Set([3, 5, 7, 9, 12]);
+      const fretOrder = state.leftHanded
+        ? Array.from({ length: FRET_COUNT + 1 }, (_, i) => FRET_COUNT - i)
+        : Array.from({ length: FRET_COUNT + 1 }, (_, i) => i);
+
+      fretboard.className = state.leftHanded ? "fretboard lefty" : "fretboard";
 
       // Fret number header row (0–12)
       const numberRow = document.createElement("div");
       numberRow.className = "fret-number-row";
-      numberRow.innerHTML = `<div class="fret-number-spacer">fret</div>`;
+      const numberSpacer = document.createElement("div");
+      numberSpacer.className = "fret-number-spacer";
+      numberSpacer.textContent = "fret";
 
-      for (let fret = 0; fret <= FRET_COUNT; fret++) {
+      if (!state.leftHanded) {
+        numberRow.appendChild(numberSpacer);
+      }
+
+      fretOrder.forEach((fret) => {
         const cell = document.createElement("div");
         cell.className = "fret-number";
         cell.textContent = fret;
         numberRow.appendChild(cell);
+      });
+
+      if (state.leftHanded) {
+        numberRow.appendChild(numberSpacer);
       }
 
       fretboard.appendChild(numberRow);
@@ -974,9 +1001,12 @@
         const label = document.createElement("div");
         label.className = "string-label";
         label.textContent = namingSet[openPc];
-        row.appendChild(label);
 
-        for (let fret = 0; fret <= FRET_COUNT; fret++) {
+        if (!state.leftHanded) {
+          row.appendChild(label);
+        }
+
+        fretOrder.forEach((fret) => {
           const pcIndex = (openPc + fret) % 12;
           const fretEl = document.createElement("div");
           fretEl.className = "fret";
@@ -987,6 +1017,10 @@
             <div class="fret-dot" style="opacity: ${fretMarkers.has(fret) ? 1 : 0};"></div>
           `;
           row.appendChild(fretEl);
+        });
+
+        if (state.leftHanded) {
+          row.appendChild(label);
         }
 
         fretboard.appendChild(row);
