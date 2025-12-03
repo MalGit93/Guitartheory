@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3NPS Master Visualizer (Shape View)</title>
+  <style>
+    :root {
+      --bg-dark: #020617;
+      --bg-panel: #0f172a;
+      --accent: #38bdf8; /* Cyan */
+      --accent-glow: rgba(56, 189, 248, 0.4);
+      --root: #f43f5e;   /* Rose */
+      --root-glow: rgba(244, 63, 94, 0.5);
+      --chord: #fbbf24;  /* Amber */
+      --text-main: #e2e8f0;
+      --text-muted: #94a3b8;
+      --border: #1e293b;
+      --success: #22c55e;
+      --shape: #a78bfa; /* Purple for shape highlight */
+    }
+
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg-dark);
+      color: var(--text-main);
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* Header & Controls */
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 20px;
+    }
+
+    h1 { margin: 0; font-size: 1.5rem; letter-spacing: -0.025em; }
+    h1 span { color: var(--accent); }
+
+    .controls {
+      display: flex;
+      gap: 15px;
+      align-items: center;
+    }
+
+    select, button {
+      background: var(--bg-panel);
+      color: var(--text-main);
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    select:focus, button:hover {
+      border-color: var(--accent);
+      outline: none;
+    }
+
+    button:active {
+      transform: translateY(1px);
+    }
+    
+    .play-btn {
+      background: rgba(34, 197, 94, 0.1);
+      border-color: rgba(34, 197, 94, 0.3);
+      color: var(--success);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 500;
+    }
+    .play-btn:hover {
+      background: rgba(34, 197, 94, 0.2);
+      border-color: var(--success);
+    }
+
+    .shape-btn {
+      background: rgba(167, 139, 250, 0.1);
+      border-color: rgba(167, 139, 250, 0.3);
+      color: var(--shape);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 500;
+    }
+    .shape-btn:hover { background: rgba(167, 139, 250, 0.2); }
+    .shape-btn.active {
+      background: var(--shape);
+      color: #000;
+      box-shadow: 0 0 10px rgba(167, 139, 250, 0.4);
+    }
+
+    /* Panels */
+    .panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      position: relative;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+    
+    .panel-title { font-weight: 600; color: var(--text-muted); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; }
+
+    /* Canvas Wrappers */
+    .canvas-wrapper {
+      width: 100%;
+      overflow-x: auto;
+      border-radius: 8px;
+      background: #000;
+      box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+    }
+
+    canvas {
+      display: block;
+    }
+
+    /* Tablature Output */
+    .tab-output {
+      font-family: 'Fira Code', 'Courier New', monospace;
+      background: #050505;
+      padding: 15px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      color: var(--accent);
+      white-space: pre;
+      overflow-x: auto;
+      font-size: 0.9rem;
+      line-height: 1.4;
+    }
+
+    /* Chord Table */
+    .chord-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 10px;
+    }
+
+    .chord-card {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid transparent;
+      padding: 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+    }
+
+    .chord-card:hover {
+      background: rgba(255,255,255,0.08);
+      transform: translateY(-2px);
+    }
+
+    .chord-card.active {
+      border-color: var(--chord);
+      background: rgba(251, 191, 36, 0.1);
+    }
+
+    .chord-card .roman { font-size: 0.8rem; color: var(--text-muted); }
+    .chord-card .name { font-weight: bold; font-size: 1.1rem; color: var(--text-main); margin: 4px 0; }
+    .chord-card .notes { font-size: 0.75rem; color: var(--text-muted); }
+
+    /* Progression Section */
+    .progression-buttons {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+      flex-wrap: wrap;
+    }
+    
+    .prog-btn {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      padding: 8px 12px;
+    }
+    .prog-btn span { font-weight: bold; color: var(--accent); margin-bottom: 2px; }
+    .prog-btn:hover { background: rgba(255,255,255,0.1); }
+
+    .progression-result {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .prog-pill {
+      background: var(--bg-dark);
+      border: 1px dashed var(--chord);
+      color: var(--chord);
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .prog-pill:hover { background: rgba(251, 191, 36, 0.1); }
+    .prog-pill span { font-size: 0.75rem; opacity: 0.7; }
+
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>3NPS <span>Logic</span></h1>
+    <div class="controls">
+      <div>
+        <label for="keySelect">Key:</label>
+        <select id="keySelect"></select>
+      </div>
+      <button id="clearChordBtn">Clear Chord</button>
+    </div>
+  </header>
+
+  <!-- Diatonic Chords & Progressions -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">Diatonic Triads</span>
+    </div>
+    <div id="chordContainer" class="chord-grid"></div>
+
+    <div style="margin-top: 30px; border-top: 1px solid var(--border); padding-top: 20px;">
+      <div class="panel-header">
+        <span class="panel-title">Common Progressions</span>
+      </div>
+      <div class="progression-buttons">
+        <button class="prog-btn" onclick="showProgression([0, 3, 4])">
+          <span>I – IV – V</span>
+          Basic 3-Chord
+        </button>
+        <button class="prog-btn" onclick="showProgression([0, 4, 5, 3])">
+          <span>I – V – vi – IV</span>
+          Pop Anthem
+        </button>
+        <button class="prog-btn" onclick="showProgression([1, 4, 0])">
+          <span>ii – V – I</span>
+          Jazz Turnaround
+        </button>
+      </div>
+      <div id="progressionOutput" class="progression-result"></div>
+    </div>
+  </div>
+
+  <!-- TAB Logic -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">3 Notes Per String (Scale Generator)</span>
+      <div class="controls">
+        <button id="toggleShapeBtn" class="shape-btn">
+          👁 Highlight Pattern
+        </button>
+        <button id="playScaleBtn" class="play-btn">
+          <span>▶</span> Play Scale
+        </button>
+        <div style="width: 1px; height: 20px; background: var(--border); margin: 0 10px;"></div>
+        <label>Start Root on:</label>
+        <select id="startStringSelect">
+          <option value="0">Low E String</option>
+          <option value="1">A String</option>
+          <option value="2">D String</option>
+          <option value="3">G String</option>
+        </select>
+      </div>
+    </div>
+    
+    <!-- Fret View -->
+    <div class="panel-header" style="margin-bottom: 5px; justify-content: flex-start; gap: 10px;">
+      <span class="panel-title" style="font-size: 0.8rem; color: var(--accent);">Fret Numbers</span>
+    </div>
+    <div class="tab-output" id="tabOutput">Select a key to generate TAB...</div>
+
+    <!-- Note View -->
+    <div class="panel-header" style="margin-top: 20px; margin-bottom: 5px; justify-content: flex-start; gap: 10px;">
+      <span class="panel-title" style="font-size: 0.8rem; color: var(--success);">Note Names (Cross-Reference)</span>
+    </div>
+    <div class="tab-output" id="noteOutput">Select a key to generate Notes...</div>
+
+    <p style="font-size: 0.8rem; color: var(--text-muted); margin-top:10px;">
+      *Logic: Projects fixed Ionian intervals (0, 2, 4...) onto strings. Automatically corrects for the B-string tuning shift.
+    </p>
+  </div>
+
+  <!-- Fretboard Canvas -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">Fretboard (Frets 0-16)</span>
+      <div class="controls" style="font-size: 0.8rem;">
+        <label><input type="checkbox" id="showNotes" checked> Show Names</label>
+        <label><input type="checkbox" id="leftHanded"> Left Handed</label>
+      </div>
+    </div>
+    <div class="canvas-wrapper">
+      <canvas id="fretCanvas" height="220"></canvas>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/**
+ * AUDIO / THEORY CONSTANTS
+ */
+const NOTES_SHARP = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+const NOTES_FLAT  = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
+const MAJOR_STEPS = [0, 2, 4, 5, 7, 9, 11]; // Semitones from root
+
+// Guitar Logic: Standard Tuning (MIDI Note Numbers: E2=40)
+// E2, A2, D3, G3, B3, E4
+const TUNING = [40, 45, 50, 55, 59, 64]; 
+const STRING_NAMES = ["E", "A", "D", "G", "B", "e"];
+
+// The 3NPS Ionian Projection Pattern (Semitones from Root)
+const IONIAN_3NPS_OFFSETS = [
+  0, 2, 4,    // String 1: Root, M2, M3
+  5, 7, 9,    // String 2: P4, P5, M6
+  11, 12, 14, // String 3: M7, Root, M2
+  16, 17, 19, // String 4: M3, P4, P5
+  21, 23, 24, // String 5: M6, M7, Root
+  26, 28, 29  // String 6: M2, M3, P4
+];
+
+/**
+ * STATE MANAGEMENT
+ */
+const state = {
+  rootNoteIndex: 0, // 0=C
+  useFlats: false,
+  scaleNotes: [], // Array of integers 0-11
+  selectedChord: null, // { root: int, notes: [int, int, int] }
+  startString: 0, // 0 = Low E
+  isLeftHanded: false,
+  showNoteNames: true,
+  generatedTabPositions: [], // For audio playback { pitch }
+  active3NPSPositions: [], // For fretboard highlighting { string, fret }
+  highlight3NPS: false // Toggle state
+};
+
+/**
+ * INITIALIZATION
+ */
+function init() {
+  const select = document.getElementById('keySelect');
+  const keys = [
+    {n:"C Major", i:0, f:false}, {n:"G Major", i:7, f:false}, {n:"D Major", i:2, f:false},
+    {n:"A Major", i:9, f:false}, {n:"E Major", i:4, f:false}, {n:"B Major", i:11, f:false},
+    {n:"F# Major", i:6, f:false}, {n:"F Major", i:5, f:true}, {n:"Bb Major", i:10, f:true},
+    {n:"Eb Major", i:3, f:true}, {n:"Ab Major", i:8, f:true}, {n:"Db Major", i:1, f:true}
+  ];
+
+  keys.forEach(k => {
+    const opt = document.createElement('option');
+    opt.value = JSON.stringify(k);
+    opt.textContent = k.n;
+    select.appendChild(opt);
+  });
+
+  select.addEventListener('change', (e) => {
+    const val = JSON.parse(e.target.value);
+    setKey(val.i, val.f);
+  });
+
+  document.getElementById('startStringSelect').addEventListener('change', (e) => {
+    state.startString = parseInt(e.target.value);
+    renderTab(); // Recalc positions
+    if(state.highlight3NPS) renderFretboard(); // Redraw if shape view is on
+  });
+
+  document.getElementById('clearChordBtn').addEventListener('click', () => {
+    state.selectedChord = null;
+    renderAll();
+  });
+
+  document.getElementById('leftHanded').addEventListener('change', (e) => {
+    state.isLeftHanded = e.target.checked;
+    renderFretboard();
+  });
+
+  document.getElementById('showNotes').addEventListener('change', (e) => {
+    state.showNoteNames = e.target.checked;
+    renderFretboard();
+  });
+  
+  document.getElementById('playScaleBtn').addEventListener('click', playScaleAudio);
+
+  document.getElementById('toggleShapeBtn').addEventListener('click', (e) => {
+    state.highlight3NPS = !state.highlight3NPS;
+    e.target.classList.toggle('active', state.highlight3NPS);
+    renderFretboard();
+  });
+
+  // Handle Resize
+  window.addEventListener('resize', () => {
+    resizeCanvases();
+    renderAll();
+  });
+
+  // Initial Set
+  setKey(0, false);
+  resizeCanvases();
+}
+
+function setKey(rootIndex, useFlats) {
+  state.rootNoteIndex = rootIndex;
+  state.useFlats = useFlats;
+  state.scaleNotes = MAJOR_STEPS.map(step => (rootIndex + step) % 12);
+  state.selectedChord = null;
+  document.getElementById('progressionOutput').innerHTML = ''; // Clear progressions
+  renderAll();
+}
+
+function renderAll() {
+  renderChords();
+  renderTab(); // Must run before fretboard to populate 3NPS data
+  renderFretboard();
+}
+
+function getNoteName(index, useFlats) {
+  return useFlats ? NOTES_FLAT[index % 12] : NOTES_SHARP[index % 12];
+}
+
+/**
+ * LOGIC: DIATONIC CHORDS & PROGRESSIONS
+ */
+function renderChords() {
+  const container = document.getElementById('chordContainer');
+  container.innerHTML = '';
+  
+  const romans = ["I", "ii", "iii", "IV", "V", "vi", "vii°"];
+  
+  for(let i=0; i<7; i++) {
+    const rootVal = state.scaleNotes[i];
+    const thirdVal = state.scaleNotes[(i+2)%7];
+    const fifthVal = state.scaleNotes[(i+4)%7];
+    
+    const div = document.createElement('div');
+    div.className = 'chord-card';
+    if(state.selectedChord && state.selectedChord.root === rootVal) {
+      div.classList.add('active');
+    }
+    
+    const rootName = getNoteName(rootVal, state.useFlats);
+    let suffix = "";
+    if(i===1 || i===2 || i===5) suffix = "m";
+    if(i===6) suffix = "dim";
+
+    div.innerHTML = `
+      <div class="roman">${romans[i]}</div>
+      <div class="name">${rootName}${suffix}</div>
+      <div class="notes">${rootName} - ${getNoteName(thirdVal, state.useFlats)} - ${getNoteName(fifthVal, state.useFlats)}</div>
+    `;
+
+    div.addEventListener('click', () => selectChord(rootVal, thirdVal, fifthVal));
+    container.appendChild(div);
+  }
+}
+
+function selectChord(root, third, fifth) {
+  if(state.selectedChord && state.selectedChord.root === root) {
+    state.selectedChord = null;
+  } else {
+    state.selectedChord = { root: root, notes: [root, third, fifth] };
+  }
+  renderAll();
+}
+
+window.showProgression = function(indices) {
+  const container = document.getElementById('progressionOutput');
+  container.innerHTML = '';
+  const romans = ["I", "ii", "iii", "IV", "V", "vi", "vii°"];
+
+  indices.forEach(idx => {
+    const rootVal = state.scaleNotes[idx];
+    const thirdVal = state.scaleNotes[(idx+2)%7];
+    const fifthVal = state.scaleNotes[(idx+4)%7];
+    
+    const rootName = getNoteName(rootVal, state.useFlats);
+    let suffix = "";
+    if(idx===1 || idx===2 || idx===5) suffix = "m";
+    if(idx===6) suffix = "dim";
+
+    const btn = document.createElement('div');
+    btn.className = 'prog-pill';
+    btn.innerHTML = `<span>${romans[idx]}</span> ${rootName}${suffix}`;
+    
+    btn.addEventListener('click', () => {
+        state.selectedChord = { root: rootVal, notes: [rootVal, thirdVal, fifthVal] };
+        renderAll();
+    });
+
+    container.appendChild(btn);
+  });
+};
+
+
+/**
+ * LOGIC & RENDER: TAB GENERATOR (UPDATED FOR DUAL VIEW + 3NPS HIGHLIGHT)
+ */
+function renderTab() {
+  const outputFret = document.getElementById('tabOutput');
+  const outputNote = document.getElementById('noteOutput');
+  
+  const rootIndex = state.rootNoteIndex;
+  const startStringIdx = state.startString;
+
+  state.generatedTabPositions = []; // reset for audio
+  state.active3NPSPositions = [];   // reset for fretboard highlight
+
+  // Find valid root (0-15)
+  let startFret = -1;
+  const openPitch = TUNING[startStringIdx];
+  
+  for(let f=0; f<=15; f++) {
+    if ((openPitch + f) % 12 === rootIndex) {
+      startFret = f;
+      break;
+    }
+  }
+
+  if (startFret === -1) {
+    const err = "Error: Could not find root on this string within reasonable range.";
+    outputFret.textContent = err;
+    outputNote.textContent = err;
+    return;
+  }
+
+  const anchorPitch = openPitch + startFret;
+  let positions = [];
+  let intervalIdx = 0;
+
+  for (let s = startStringIdx; s < 6; s++) {
+    if (intervalIdx >= IONIAN_3NPS_OFFSETS.length) break;
+
+    for (let n = 0; n < 3; n++) {
+      if (intervalIdx >= IONIAN_3NPS_OFFSETS.length) break;
+
+      const offset = IONIAN_3NPS_OFFSETS[intervalIdx];
+      const targetPitch = anchorPitch + offset;
+      const fret = targetPitch - TUNING[s];
+      const isRoot = (offset % 12 === 0);
+
+      // Save for render
+      positions.push({ string: s, fret: fret, isRoot: isRoot });
+      // Save for audio
+      state.generatedTabPositions.push({ pitch: targetPitch });
+      // Save for visualizer
+      state.active3NPSPositions.push({ string: s, fret: fret });
+      
+      intervalIdx++;
+    }
+  }
+
+  // --- BUILD FRET TAB ---
+  let fretLines = ["e|", "B|", "G|", "D|", "A|", "E|"];
+  // --- BUILD NOTE TAB ---
+  let noteLines = ["e|", "B|", "G|", "D|", "A|", "E|"];
+  
+  positions.forEach(p => {
+    const sInv = 5 - p.string; 
+    
+    // Catch-up Padding (Fret View)
+    let maxLenFret = 0;
+    for(let i=0; i<6; i++) maxLenFret = Math.max(maxLenFret, fretLines[i].length);
+    for(let i=0; i<6; i++) while(fretLines[i].length < maxLenFret) fretLines[i] += "-";
+
+    // Catch-up Padding (Note View)
+    let maxLenNote = 0;
+    for(let i=0; i<6; i++) maxLenNote = Math.max(maxLenNote, noteLines[i].length);
+    for(let i=0; i<6; i++) while(noteLines[i].length < maxLenNote) noteLines[i] += "-";
+
+    // Fret String
+    let fretStr = p.fret.toString();
+    if(p.isRoot) fretStr = `(${p.fret})`;
+    fretLines[sInv] += "-" + fretStr + "-";
+
+    // Note String
+    const pc = (TUNING[p.string] + p.fret) % 12;
+    let noteName = getNoteName(pc, state.useFlats);
+    if(p.isRoot) noteName = `(${noteName})`;
+    noteLines[sInv] += "-" + noteName + "-";
+  });
+
+  // Final Padding Fret
+  let maxLenFret = 0;
+  for(let i=0; i<6; i++) maxLenFret = Math.max(maxLenFret, fretLines[i].length);
+  for(let i=0; i<6; i++) while(fretLines[i].length < maxLenFret) fretLines[i] += "-";
+
+  // Final Padding Note
+  let maxLenNote = 0;
+  for(let i=0; i<6; i++) maxLenNote = Math.max(maxLenNote, noteLines[i].length);
+  for(let i=0; i<6; i++) while(noteLines[i].length < maxLenNote) noteLines[i] += "-";
+
+  // Text Headers
+  let header = `Key: ${getNoteName(state.rootNoteIndex, state.useFlats)} Major\n`;
+  header += `Pattern starting on ${STRING_NAMES[startStringIdx]} string, fret ${startFret}\n\n`;
+
+  // Output Fret
+  let textFret = header;
+  for(let i=0; i<6; i++) textFret += fretLines[i] + "|\n";
+  outputFret.textContent = textFret;
+
+  // Output Note
+  let textNote = header;
+  for(let i=0; i<6; i++) textNote += noteLines[i] + "|\n";
+  outputNote.textContent = textNote;
+}
+
+/**
+ * AUDIO ENGINE
+ */
+function playScaleAudio() {
+  if(!state.generatedTabPositions.length) return;
+
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  const ctx = new AudioContext();
+  
+  const now = ctx.currentTime;
+  const noteDuration = 0.25; // seconds
+  
+  // Combine Ascending + Descending
+  let sequence = [...state.generatedTabPositions];
+  // Add descending (excluding the last note to avoid double hit)
+  for(let i=state.generatedTabPositions.length-2; i>=0; i--) {
+    sequence.push(state.generatedTabPositions[i]);
+  }
+
+  sequence.forEach((note, i) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    
+    // MIDI to Freq
+    const freq = 440 * Math.pow(2, (note.pitch - 69) / 12);
+    osc.frequency.value = freq;
+    
+    // Envelope
+    const startTime = now + (i * noteDuration);
+    gain.gain.setValueAtTime(0, startTime);
+    gain.gain.linearRampToValueAtTime(0.3, startTime + 0.05); // Attack
+    gain.gain.exponentialRampToValueAtTime(0.001, startTime + noteDuration - 0.05); // Decay
+    
+    osc.start(startTime);
+    osc.stop(startTime + noteDuration);
+  });
+}
+
+/**
+ * CANVAS RENDER: FRETBOARD
+ */
+function resizeCanvases() {
+  const fretCanvas = document.getElementById('fretCanvas');
+  const width = fretCanvas.parentElement.clientWidth;
+  fretCanvas.width = width;
+  renderAll();
+}
+
+function renderFretboard() {
+  const canvas = document.getElementById('fretCanvas');
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width;
+  const h = canvas.height;
+  
+  ctx.clearRect(0, 0, w, h);
+  
+  // CHANGED: Expanded to 16 Frets to catch high 3NPS extensions
+  const numFrets = 16; 
+  const marginX = 30;
+  const marginY = 30;
+  const boardW = w - (marginX * 2);
+  const boardH = h - (marginY * 2);
+  const fretSpacing = boardW / numFrets;
+  const stringSpacing = boardH / 5;
+
+  const getFretX = (f) => {
+    if (state.isLeftHanded) {
+      return (w - marginX) - (f * fretSpacing);
+    }
+    return marginX + (f * fretSpacing);
+  };
+
+  ctx.fillStyle = "#333";
+  const nutX = getFretX(0);
+  const nutW = state.isLeftHanded ? -5 : 5;
+  ctx.fillRect(nutX, marginY, nutW, boardH);
+
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = "#475569";
+  for(let f=0; f<=numFrets; f++) {
+    const x = getFretX(f);
+    ctx.beginPath();
+    ctx.moveTo(x, marginY);
+    ctx.lineTo(x, h - marginY);
+    ctx.stroke();
+    
+    ctx.fillStyle = "#64748b";
+    ctx.font = "12px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(f, x, h - 5);
+  }
+
+  for(let s=0; s<6; s++) {
+    const stringY = marginY + (5-s) * stringSpacing;
+    ctx.beginPath();
+    ctx.strokeStyle = "#94a3b8";
+    ctx.lineWidth = 1 + (s * 0.4);
+    ctx.moveTo(marginX, stringY);
+    ctx.lineTo(w - marginX, stringY);
+    ctx.stroke();
+  }
+
+  const inlays = [3, 5, 7, 9, 12, 15];
+  ctx.fillStyle = "rgba(255,255,255,0.1)";
+  const middleY = marginY + (2.5 * stringSpacing);
+  inlays.forEach(fret => {
+    if(fret > numFrets) return;
+    const x = (getFretX(fret) + getFretX(fret-1)) / 2;
+    ctx.beginPath();
+    if(fret === 12) {
+      ctx.arc(x, middleY - 10, 6, 0, Math.PI*2);
+      ctx.arc(x, middleY + 10, 6, 0, Math.PI*2);
+    } else {
+      ctx.arc(x, middleY, 8, 0, Math.PI*2);
+    }
+    ctx.fill();
+  });
+
+  for(let s=0; s<6; s++) {
+    const openPitch = TUNING[s];
+    const stringY = marginY + (5-s) * stringSpacing;
+
+    for(let f=0; f<=numFrets; f++) {
+      const pitch = openPitch + f;
+      const pitchClass = pitch % 12;
+
+      let color = null;
+      let stroke = null;
+      let glow = false;
+
+      // Logic: If highlighting 3NPS, ignore scale/chord logic and only check active positions
+      if(state.highlight3NPS) {
+        const isActive = state.active3NPSPositions.some(p => p.string === s && p.fret === f);
+        if(isActive) {
+          color = "#a78bfa"; // Purple
+          // Is it root?
+          if(pitchClass === state.rootNoteIndex) {
+            color = "#f43f5e";
+            glow = true;
+          }
+        } else {
+          color = null; // Hide non-shape notes
+        }
+      } 
+      // Normal Mode (Scale + Chords)
+      else if(state.scaleNotes.includes(pitchClass)) {
+        color = "var(--accent)"; 
+        if(state.selectedChord) {
+           if(state.selectedChord.notes.includes(pitchClass)) {
+             color = "#fbbf24";
+             if(pitchClass === state.selectedChord.root) {
+               stroke = "#fff";
+               glow = true;
+             }
+           } else {
+             color = "#1e293b";
+           }
+        } else {
+          color = "#38bdf8"; 
+          if(pitchClass === state.rootNoteIndex) {
+            color = "#f43f5e";
+            glow = true;
+          }
+        }
+      }
+
+      if(color && color !== "#1e293b") {
+        const x = f === 0 ? getFretX(0) - (state.isLeftHanded ? -10 : 10) : (getFretX(f) + getFretX(f-1)) / 2;
+        
+        ctx.beginPath();
+        ctx.arc(x, stringY, 13, 0, Math.PI*2);
+        
+        if(glow) {
+          ctx.shadowBlur = 10;
+          ctx.shadowColor = color;
+        } else {
+          ctx.shadowBlur = 0;
+        }
+
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.shadowBlur = 0; 
+
+        if(stroke) {
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = stroke;
+          ctx.stroke();
+        }
+
+        if(state.showNoteNames) {
+          ctx.fillStyle = (color === "#fbbf24" || color === "#f43f5e" || color==="#38bdf8" || color==="#a78bfa") ? "#000" : "#fff";
+          ctx.font = "bold 11px sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(getNoteName(pitchClass, state.useFlats), x, stringY);
+        }
+      }
+    }
+  }
+}
+
+// Start
+init();
+
+</script>
+</body>
+</html>
