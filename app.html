@@ -365,6 +365,28 @@
       font-size: 0.9rem;
     }
 
+    /* Fret number header row */
+    .fret-number-row {
+      display: grid;
+      grid-template-columns: 44px repeat(13, minmax(38px, 1fr));
+      gap: 4px;
+      align-items: center;
+      margin-bottom: 4px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .fret-number-spacer {
+      text-align: right;
+      padding-right: 8px;
+      opacity: 0.8;
+    }
+
+    .fret-number {
+      text-align: center;
+      opacity: 0.75;
+    }
+
     .fret {
       border-radius: 10px;
       border: 1px solid var(--border-subtle);
@@ -374,6 +396,56 @@
       background: linear-gradient(180deg, rgba(15, 23, 42, 0.85), #020617);
       color: var(--text-muted);
       transition: transform var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
+    }
+
+    /* String "wire" running through each fret, with varying thickness */
+    .fret::before {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 3px;
+      right: 3px;
+      transform: translateY(-50%);
+      height: 2.4px;
+      border-radius: 999px;
+      background: linear-gradient(
+        90deg,
+        rgba(148, 163, 184, 0.85),
+        rgba(148, 163, 184, 0.4)
+      );
+      opacity: 0.7;
+      pointer-events: none;
+    }
+
+    /* Thicker → thinner from top string to bottom string */
+    .string-row[data-string-index="0"] .fret::before {
+      height: 3px;
+      opacity: 0.9;
+    }
+
+    .string-row[data-string-index="1"] .fret::before {
+      height: 2.7px;
+      opacity: 0.85;
+    }
+
+    .string-row[data-string-index="2"] .fret::before {
+      height: 2.4px;
+      opacity: 0.8;
+    }
+
+    .string-row[data-string-index="3"] .fret::before {
+      height: 2.1px;
+      opacity: 0.75;
+    }
+
+    .string-row[data-string-index="4"] .fret::before {
+      height: 1.8px;
+      opacity: 0.65;
+    }
+
+    .string-row[data-string-index="5"] .fret::before {
+      height: 1.5px;
+      opacity: 0.6;
     }
 
     .fret .fret-label {
@@ -746,6 +818,11 @@
         names.push(namingSet[currentIndex]);
       }
 
+      // Handle the enharmonic quirk in F# major (7th degree is spelled E#)
+      if (root === "F#" && names.length === 7) {
+        names[6] = "E#";
+      }
+
       return { indices, names, useFlats };
     }
 
@@ -875,9 +952,24 @@
       const strings = state.leftHanded ? [...STANDARD_TUNING].reverse() : STANDARD_TUNING;
       const fretMarkers = new Set([3, 5, 7, 9, 12]);
 
-      strings.forEach((openPc) => {
+      // Fret number header row (0–12)
+      const numberRow = document.createElement("div");
+      numberRow.className = "fret-number-row";
+      numberRow.innerHTML = `<div class="fret-number-spacer">fret</div>`;
+
+      for (let fret = 0; fret <= FRET_COUNT; fret++) {
+        const cell = document.createElement("div");
+        cell.className = "fret-number";
+        cell.textContent = fret;
+        numberRow.appendChild(cell);
+      }
+
+      fretboard.appendChild(numberRow);
+
+      strings.forEach((openPc, stringIdx) => {
         const row = document.createElement("div");
         row.className = "string-row";
+        row.dataset.stringIndex = stringIdx.toString();
 
         const label = document.createElement("div");
         label.className = "string-label";
