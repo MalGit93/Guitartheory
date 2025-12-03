@@ -349,6 +349,71 @@
       overflow-x: auto;
     }
 
+    .tab-wrapper {
+      margin-top: 10px;
+    }
+
+    .tab-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin-top: 4px;
+    }
+
+    .tab-output {
+      margin-top: 6px;
+      background: rgba(15, 23, 42, 0.9);
+      border-radius: 10px;
+      border: 1px solid var(--border-subtle);
+      padding: 8px 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 0.78rem;
+      color: var(--text-main);
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    .tab-section-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 12px 0 4px;
+      font-size: 0.95rem;
+    }
+
+    .tab-voicing-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 6px;
+    }
+
+    .tab-voicing-buttons button {
+      padding: 6px 10px;
+      border-radius: var(--radius-pill);
+      border: 1px solid var(--border-subtle);
+      background: rgba(15, 23, 42, 0.85);
+      color: var(--text-main);
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+    }
+
+    .tab-voicing-buttons button:hover {
+      background: rgba(56, 189, 248, 0.1);
+      border-color: rgba(56, 189, 248, 0.7);
+      color: var(--accent);
+      transform: translateY(-1px);
+    }
+
+    .tab-voicing-buttons button.active {
+      background: var(--accent-soft);
+      border-color: rgba(56, 189, 248, 0.9);
+      color: var(--accent-strong);
+      box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.5);
+    }
+
     .string-row {
       display: grid;
       grid-template-columns: 44px repeat(13, minmax(38px, 1fr));
@@ -696,6 +761,47 @@
               </label>
             </div>
             <div id="fretboard" class="fretboard"></div>
+
+            <div class="tab-wrapper">
+              <h2>
+                TAB view
+                <span class="tag">Scale & chords</span>
+              </h2>
+              <p class="helper">
+                3-notes-per-string major scale from the key root, plus quick voicing examples for the selected chord.
+              </p>
+
+              <div class="tab-section-title">
+                Scale pattern
+                <span class="tag">3NPS</span>
+              </div>
+              <div class="tab-controls">
+                <div class="field">
+                  <label for="tabStartString">Start on string:</label>
+                  <div class="select-box">
+                    <select id="tabStartString">
+                      <option value="0">Low E string</option>
+                      <option value="1">A string</option>
+                      <option value="2">D string</option>
+                      <option value="3">G string</option>
+                      <option value="4">B string</option>
+                      <option value="5">High e string</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <pre id="tabOutput" class="tab-output"></pre>
+
+              <div class="tab-section-title">
+                Chord voicings in TAB
+                <span class="tag">Selected chord</span>
+              </div>
+              <p class="helper">
+                Click a chord in the table or a progression pill to see compact triad shapes within a 4-fret window.
+              </p>
+              <div id="chordTabVoicingButtons" class="tab-voicing-buttons"></div>
+              <pre id="chordTabOutput" class="tab-output"></pre>
+            </div>
           </div>
         </div>
 
@@ -803,11 +909,16 @@
       chords: [],       // chord objects
       selectedChordIndex: null,
       leftHanded: false,
-      showNoteLabels: true
+      showNoteLabels: true,
+      tabStartString: 0,
+      chordTabVoicingIndex: 0
     };
 
     const FRET_COUNT = 12;
     const STANDARD_TUNING = [4, 9, 2, 7, 11, 4]; // E A D G B E (low to high) as pitch classes
+
+    // Relative semitone offsets for each open string, low E taken as 0.
+    const STRING_OPEN_SEMITONES = [0, 5, 10, 15, 19, 24];
 
     // Build major scale indices + names for a given root, taking into account sharps/flats usage
     function buildMajorScale(root) {
@@ -1063,6 +1174,284 @@
       });
     }
 
+    // Build a 3-notes-per-string major scale pattern from the key root,
+    // starting on a chosen string, within a 4-fret span.
+    function generateScaleTabPattern(startStringIndex) {
+      const scalePcs = state.scaleIndices;
+      const rootPc = state.rootIndex;
+
+      if (!scalePcs || scalePcs.length === 0) return null;
+
+      // 1) Find root fret on the chosen string within 0–FRET_COUNT
+      const openPcStart = STANDARD_TUNING[startStringIndex];
+      let rootFret = null;
+      for (let f = 0; f <= FRET_COUNT; f++) {
+        if ((openPcStart + f) % 12 === rootPc) {
+          rootFret = f;
+          break;
+        }
+      }
+      if (rootFret == null) return null;
+
+      const fretMin = rootFret;
+      const fretMax = Math.min(FRET_COUNT, rootFret + 4); // 4-fret span
+
+      const positions = [];
+      const rootSemi = STRING_OPEN_SEMITONES[startStringIndex] + rootFret;
+
+      // Always start on the root
+      positions.push({
+        stringIndex: startStringIndex,
+        fret: rootFret,
+        semitone: rootSemi,
+        isRoot: true
+      });
+
+      let lastSemitone = rootSemi;
+
+      // 2) For each string from startStringIndex upwards, grab up to 3 scale notes in that fret window
+      for (let s = startStringIndex; s < STANDARD_TUNING.length; s++) {
+        const openPc = STANDARD_TUNING[s];
+        const openSemi = STRING_OPEN_SEMITONES[s];
+
+        // First string already has the root
+        let notesOnThisString = s === startStringIndex ? 1 : 0;
+
+        for (let f = fretMin; f <= fretMax; f++) {
+          // Skip the root position we already added
+          if (s === startStringIndex && f === rootFret) continue;
+
+          const pc = (openPc + f) % 12;
+          if (!scalePcs.includes(pc)) continue;
+
+          const semi = openSemi + f;
+          if (semi <= lastSemitone) continue;
+
+          positions.push({
+            stringIndex: s,
+            fret: f,
+            semitone: semi,
+            isRoot: false
+          });
+
+          lastSemitone = semi;
+          notesOnThisString++;
+          if (notesOnThisString >= 3) break; // 3 notes per string max
+        }
+      }
+
+      // Sort strictly by pitch order
+      positions.sort((a, b) => a.semitone - b.semitone);
+
+      return { positions, rootStringIndex: startStringIndex, rootFret };
+    }
+
+    // Render the scale pattern as ASCII tab
+    function renderScaleTab() {
+      const outEl = document.getElementById("tabOutput");
+      if (!outEl) return;
+
+      const startIdx = state.tabStartString || 0;
+      const result = generateScaleTabPattern(startIdx);
+
+      if (!result || !result.positions.length) {
+        outEl.textContent = "Tab pattern not available for this key / starting string.";
+        return;
+      }
+
+      const { positions, rootStringIndex, rootFret } = result;
+
+      // Standard TAB labels, low → high
+      const stringLabelsLowToHigh = ["E", "A", "D", "G", "B", "e"];
+
+      const lines = [];
+
+      // We render TAB high → low (top line = high e)
+      for (let sDisplay = STANDARD_TUNING.length - 1; sDisplay >= 0; sDisplay--) {
+        const label = stringLabelsLowToHigh[sDisplay];
+        let line = label + "|";
+
+        positions.forEach((step) => {
+          if (step.stringIndex === sDisplay) {
+            const fret = step.fret;
+            // 3-character slot per note: --8 or -10
+            if (fret < 10) {
+              line += "--" + fret;
+            } else {
+              line += "-" + fret;
+            }
+          } else {
+            line += "---"; // empty step on this string
+          }
+        });
+
+        line += "-|";
+        lines.push(line);
+      }
+
+      const rootLabel = stringLabelsLowToHigh[rootStringIndex];
+      lines.push("");
+      lines.push(`Root at ${rootLabel} string, fret ${rootFret}.`);
+
+      outEl.textContent = lines.join("\n");
+    }
+
+    function findRootFretOnString(rootPc, stringIndex, minFret = 0) {
+      const openPcStart = STANDARD_TUNING[stringIndex];
+      for (let f = minFret; f <= FRET_COUNT; f++) {
+        if ((openPcStart + f) % 12 === rootPc) {
+          return f;
+        }
+      }
+      return null;
+    }
+
+    function buildChordVoicingForWindow(chord, startStringIndex, windowStartFret) {
+      const windowEnd = Math.min(FRET_COUNT, windowStartFret + 4);
+      const rootPc = chord.pcs[0];
+      const rootFret = findRootFretOnString(rootPc, startStringIndex, windowStartFret);
+      if (rootFret == null || rootFret > windowEnd) return null;
+
+      const positions = [{
+        stringIndex: startStringIndex,
+        fret: rootFret,
+        pc: rootPc,
+        semitone: STRING_OPEN_SEMITONES[startStringIndex] + rootFret,
+        isRoot: true
+      }];
+
+      let lastSemi = positions[0].semitone;
+
+      for (let s = startStringIndex + 1; s < STANDARD_TUNING.length; s++) {
+        const openPc = STANDARD_TUNING[s];
+        let found = null;
+
+        for (let f = windowStartFret; f <= windowEnd; f++) {
+          const pc = (openPc + f) % 12;
+          if (!chord.pcs.includes(pc)) continue;
+
+          const semi = STRING_OPEN_SEMITONES[s] + f;
+          if (semi < lastSemi) continue;
+
+          found = { stringIndex: s, fret: f, pc, semitone: semi, isRoot: pc === rootPc };
+          break;
+        }
+
+        if (found) {
+          positions.push(found);
+          lastSemi = found.semitone;
+        }
+      }
+
+      const uniquePcs = new Set(positions.map((p) => p.pc));
+      if (positions.length < 3 || uniquePcs.size < chord.pcs.length) return null;
+
+      return {
+        positions,
+        windowStartFret,
+        windowEnd,
+        startStringIndex
+      };
+    }
+
+    function generateChordVoicings(chord) {
+      const voicings = [];
+      const startStrings = [0, 1, 2]; // Low E, A, D roots are practical for quick triads
+
+      startStrings.forEach((sIdx) => {
+        const baseRoot = findRootFretOnString(chord.pcs[0], sIdx, 0);
+        if (baseRoot == null) return;
+
+        const candidates = [baseRoot];
+        const shifted = baseRoot + 5;
+        if (shifted <= FRET_COUNT) candidates.push(shifted);
+
+        candidates.forEach((startFret) => {
+          const voicing = buildChordVoicingForWindow(chord, sIdx, startFret);
+          if (voicing) {
+            const label = `${sIdx === 0 ? "Low E" : sIdx === 1 ? "A" : "D"} string, frets ${voicing.windowStartFret}–${voicing.windowEnd}`;
+            voicings.push({ ...voicing, label });
+          }
+        });
+      });
+
+      // Deduplicate by string/fret layout
+      const seen = new Set();
+      return voicings.filter((v) => {
+        const key = v.positions.map((p) => `${p.stringIndex}:${p.fret}`).join(";");
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    }
+
+    function renderChordTab() {
+      const outEl = document.getElementById("chordTabOutput");
+      const btnContainer = document.getElementById("chordTabVoicingButtons");
+      if (!outEl || !btnContainer) return;
+
+      btnContainer.innerHTML = "";
+
+      if (state.selectedChordIndex == null) {
+        outEl.textContent = "Select a chord from the table or a progression pill to see example TAB voicings.";
+        return;
+      }
+
+      const chord = state.chords[state.selectedChordIndex];
+      const voicings = generateChordVoicings(chord);
+
+      if (!voicings.length) {
+        outEl.textContent = "No compact voicings found in the first 12 frets for this chord.";
+        return;
+      }
+
+      if (state.chordTabVoicingIndex >= voicings.length) {
+        state.chordTabVoicingIndex = 0;
+      }
+
+      voicings.forEach((voicing, idx) => {
+        const btn = document.createElement("button");
+        btn.textContent = voicing.label;
+        btn.className = idx === state.chordTabVoicingIndex ? "active" : "";
+        btn.addEventListener("click", () => {
+          state.chordTabVoicingIndex = idx;
+          renderChordTab();
+        });
+        btnContainer.appendChild(btn);
+      });
+
+      const active = voicings[state.chordTabVoicingIndex];
+      const stringLabelsLowToHigh = ["E", "A", "D", "G", "B", "e"];
+
+      const lines = [];
+
+      for (let sDisplay = STANDARD_TUNING.length - 1; sDisplay >= 0; sDisplay--) {
+        const label = stringLabelsLowToHigh[sDisplay];
+        let line = label + "|";
+
+        const pos = active.positions.find((p) => p.stringIndex === sDisplay);
+        if (pos) {
+          const fret = pos.fret;
+          if (fret < 10) {
+            line += "-" + fret + "-";
+          } else {
+            line += fret + "-";
+          }
+        } else {
+          line += "---";
+        }
+
+        line += "|";
+        lines.push(line);
+      }
+
+      lines.push("");
+      lines.push(`${chord.name} (${chord.roman}) – ${active.label}.`);
+      lines.push(`Notes: ${chord.notes.join(" – ")}`);
+
+      outEl.textContent = lines.join("\n");
+    }
+
     // Render chord table
     function renderChordTable() {
       const tbody = document.getElementById("chordTableBody");
@@ -1143,17 +1532,21 @@
         state.selectedChordIndex = null;
       } else {
         state.selectedChordIndex = idx;
+        state.chordTabVoicingIndex = 0;
       }
       updateChordRowSelection();
       updateKeyboardHighlighting();
       updateFretboardHighlighting();
+      renderChordTab();
     }
 
     function clearChordSelection() {
       state.selectedChordIndex = null;
+      state.chordTabVoicingIndex = 0;
       updateChordRowSelection();
       updateKeyboardHighlighting();
       updateFretboardHighlighting();
+      renderChordTab();
     }
 
     // Roman numeral -> degree index (0-based)
@@ -1233,6 +1626,7 @@
       state.scaleNames = scaleData.names;
       state.chords = buildDiatonicChords(scaleData.indices, scaleData.names);
       state.selectedChordIndex = null;
+      state.chordTabVoicingIndex = 0;
 
       renderScalePills();
       buildKeyboard();
@@ -1240,6 +1634,8 @@
       renderChordTable();
       updateKeyboardHighlighting();
       updateFretboardHighlighting();
+      renderScaleTab();
+      renderChordTab();
 
       // Clear progression display
       document.getElementById("progressionPills").innerHTML = "";
@@ -1266,6 +1662,12 @@
       document.getElementById("noteLabelToggle").addEventListener("change", (e) => {
         state.showNoteLabels = e.target.checked;
         updateFretboardHighlighting();
+      });
+
+      const tabStartSelect = document.getElementById("tabStartString");
+      tabStartSelect.addEventListener("change", (e) => {
+        state.tabStartString = parseInt(e.target.value, 10);
+        renderScaleTab();
       });
 
       // Default key
