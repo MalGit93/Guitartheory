@@ -1193,9 +1193,6 @@
       }
       if (rootFret == null) return null;
 
-      const fretMin = rootFret;
-      const fretMax = Math.min(FRET_COUNT, rootFret + 4); // 4-fret span
-
       const positions = [];
       const rootSemi = STRING_OPEN_SEMITONES[startStringIndex] + rootFret;
 
@@ -1208,16 +1205,49 @@
       });
 
       let lastSemitone = rootSemi;
+      let lastFret = rootFret;
 
       // 2) For each string from startStringIndex upwards, grab up to 3 scale notes in that fret window
       for (let s = startStringIndex; s < STANDARD_TUNING.length; s++) {
         const openPc = STANDARD_TUNING[s];
         const openSemi = STRING_OPEN_SEMITONES[s];
 
-        // First string already has the root
-        let notesOnThisString = s === startStringIndex ? 1 : 0;
+        // Find the first scale tone on this string that stays in pitch order.
+        let firstFret = null;
+        let notesOnThisString = 0;
 
-        for (let f = fretMin; f <= fretMax; f++) {
+        if (s === startStringIndex) {
+          firstFret = rootFret;
+          notesOnThisString = 1; // root already added
+        } else {
+          const searchStart = Math.max(0, lastFret - 1);
+          for (let f = searchStart; f <= FRET_COUNT; f++) {
+            const pc = (openPc + f) % 12;
+            if (!scalePcs.includes(pc)) continue;
+
+            const semi = openSemi + f;
+            if (semi <= lastSemitone) continue;
+
+            firstFret = f;
+            positions.push({
+              stringIndex: s,
+              fret: f,
+              semitone: semi,
+              isRoot: false
+            });
+
+            lastSemitone = semi;
+            lastFret = f;
+            notesOnThisString = 1;
+            break;
+          }
+        }
+
+        if (firstFret == null) continue; // No scale tones left on this string within range
+
+        const windowEnd = Math.min(FRET_COUNT, firstFret + 4);
+
+        for (let f = firstFret + 1; f <= windowEnd; f++) {
           // Skip the root position we already added
           if (s === startStringIndex && f === rootFret) continue;
 
@@ -1235,6 +1265,7 @@
           });
 
           lastSemitone = semi;
+          lastFret = f;
           notesOnThisString++;
           if (notesOnThisString >= 3) break; // 3 notes per string max
         }
