@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Major Scale & Chord Visualiser</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --bg-panel: #020617;
+      --bg-panel-alt: #0b1120;
+      --accent: #38bdf8;
+      --accent-soft: rgba(56, 189, 248, 0.12);
+      --accent-strong: #06b6d4;
+      --text-main: #e5e7eb;
+      --text-muted: #9ca3af;
+      --border-subtle: #1f2937;
+      --danger: #f97373;
+      --radius-lg: 12px;
+      --radius-pill: 999px;
+      --transition-fast: 150ms ease-out;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 24px;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #1f2937 0, #020617 55%);
+      color: var(--text-main);
+    }
+
+    .app {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 24px 24px 32px;
+      background: linear-gradient(135deg, var(--bg-panel), var(--bg-panel-alt));
+      border-radius: 18px;
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      box-shadow:
+        0 18px 45px rgba(15, 23, 42, 0.8),
+        0 0 0 1px rgba(15, 23, 42, 0.9);
+    }
+
+    h1 {
+      font-size: 1.7rem;
+      margin: 0 0 4px;
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+
+    h1 span.label {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      color: var(--accent-strong);
+      border-radius: var(--radius-pill);
+      padding: 2px 10px;
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      background: radial-gradient(circle at top, rgba(56, 189, 248, 0.1), transparent 58%);
+    }
+
+    .subtitle {
+      margin: 0 0 18px;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+      gap: 18px;
+      margin-top: 4px;
+    }
+
+    .panel {
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-subtle);
+      background: radial-gradient(circle at top left, rgba(148, 163, 184, 0.09), transparent 55%);
+      padding: 14px 16px 16px;
+    }
+
+    .panel h2 {
+      font-size: 0.95rem;
+      margin: 0 0 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .panel h2 span.tag {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--accent);
+    }
+
+    .panel p.helper {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin: 0 0 10px;
+    }
+
+    /* Controls */
+    .controls-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .field {
+      display: inline-flex;
+      flex-direction: column;
+      gap: 2px;
+      font-size: 0.8rem;
+    }
+
+    .field label {
+      color: var(--text-muted);
+    }
+
+    .select-box {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: var(--radius-pill);
+      border: 1px solid var(--border-subtle);
+      background: rgba(15, 23, 42, 0.8);
+    }
+
+    select {
+      background: transparent;
+      border: none;
+      color: var(--text-main);
+      font: inherit;
+      padding: 0;
+      outline: none;
+      cursor: pointer;
+    }
+
+    button.reset-btn {
+      padding: 6px 10px;
+      border-radius: var(--radius-pill);
+      border: 1px solid var(--border-subtle);
+      background: rgba(15, 23, 42, 0.9);
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+    }
+
+    button.reset-btn span.icon {
+      font-size: 0.85rem;
+    }
+
+    button.reset-btn:hover {
+      background: rgba(30, 64, 175, 0.9);
+      border-color: rgba(96, 165, 250, 0.7);
+      color: #e5e7eb;
+      transform: translateY(-1px);
+    }
+
+    /* Pills */
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .pill {
+      border-radius: var(--radius-pill);
+      padding: 4px 10px;
+      font-size: 0.83rem;
+      border: 1px solid rgba(148, 163, 184, 0.3);
+      background: rgba(15, 23, 42, 0.85);
+      color: var(--text-main);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+      cursor: default;
+    }
+
+    .pill span.sub {
+      font-size: 0.74rem;
+      color: var(--text-muted);
+    }
+
+    .pill.chord-pill {
+      cursor: pointer;
+      border-style: dashed;
+    }
+
+    .pill.chord-pill:hover {
+      border-color: rgba(56, 189, 248, 0.8);
+      color: var(--accent-strong);
+    }
+
+    .pill.selected {
+      background: var(--accent-soft);
+      border-color: rgba(56, 189, 248, 0.9);
+      box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.5);
+    }
+
+    /* Keyboard */
+    .keyboard-wrapper {
+      margin-top: 6px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+
+    .keyboard {
+      display: grid;
+      grid-auto-flow: column;
+      grid-template-columns: repeat(24, minmax(32px, 1fr));
+      gap: 3px;
+    }
+
+    .key {
+      padding: 14px 4px 10px;
+      border-radius: 10px;
+      border: 1px solid var(--border-subtle);
+      text-align: center;
+      font-size: 0.8rem;
+      position: relative;
+      background: radial-gradient(circle at top, rgba(15, 23, 42, 0.6), #020617);
+      color: var(--text-muted);
+      user-select: none;
+      transition:
+        transform var(--transition-fast),
+        border-color var(--transition-fast),
+        box-shadow var(--transition-fast),
+        background var(--transition-fast),
+        color var(--transition-fast);
+    }
+
+    .key .note {
+      font-weight: 600;
+      font-size: 0.8rem;
+    }
+
+    .key .degree-label {
+      font-size: 0.7rem;
+      margin-top: 2px;
+      color: var(--text-muted);
+    }
+
+    .key.in-scale {
+      border-color: rgba(56, 189, 248, 0.7);
+      color: var(--text-main);
+      background:
+        radial-gradient(circle at 20% 0, rgba(56, 189, 248, 0.22), transparent 55%),
+        radial-gradient(circle at 80% 120%, rgba(96, 165, 250, 0.25), transparent 60%),
+        #020617;
+      box-shadow:
+        0 0 0 1px rgba(56, 189, 248, 0.4),
+        0 6px 12px rgba(15, 23, 42, 0.9);
+      transform: translateY(-1px);
+    }
+
+    .key.chord-note::after {
+      content: "";
+      position: absolute;
+      inset: 3px;
+      border-radius: 8px;
+      border: 1px solid rgba(251, 191, 36, 0.95);
+      box-shadow: 0 0 12px rgba(251, 191, 36, 0.7);
+      pointer-events: none;
+    }
+
+    .key.root-note {
+      box-shadow:
+        0 0 0 1px rgba(244, 63, 94, 0.7),
+        0 0 14px rgba(244, 63, 94, 0.6);
+      border-color: rgba(244, 63, 94, 0.9);
+    }
+
+    .legend {
+      margin-top: 6px;
+      font-size: 0.76rem;
+      color: var(--text-muted);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .legend-box {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .legend-swatch {
+      width: 14px;
+      height: 8px;
+      border-radius: 999px;
+      border: 1px solid var(--border-subtle);
+    }
+
+    .legend-swatch.scale {
+      border-color: rgba(56, 189, 248, 0.8);
+      background: rgba(56, 189, 248, 0.2);
+    }
+
+    .legend-swatch.chord {
+      border-color: rgba(251, 191, 36, 0.9);
+      background: rgba(251, 191, 36, 0.25);
+    }
+
+    .legend-swatch.root {
+      border-color: rgba(244, 63, 94, 0.9);
+      background: rgba(248, 113, 113, 0.35);
+    }
+
+    /* Chord table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 6px;
+      font-size: 0.8rem;
+    }
+
+    thead {
+      background: rgba(15, 23, 42, 0.95);
+    }
+
+    th, td {
+      padding: 6px 6px;
+      text-align: left;
+      border-bottom: 1px solid rgba(31, 41, 55, 0.8);
+      white-space: nowrap;
+    }
+
+    th {
+      font-weight: 500;
+      color: var(--text-muted);
+      font-size: 0.78rem;
+    }
+
+    tbody tr {
+      cursor: pointer;
+      transition: background var(--transition-fast), transform var(--transition-fast);
+    }
+
+    tbody tr:hover {
+      background: rgba(15, 23, 42, 0.9);
+      transform: translateY(-1px);
+    }
+
+    tbody tr.selected-row {
+      background: rgba(56, 189, 248, 0.12);
+    }
+
+    tbody tr.selected-row td {
+      color: var(--accent-strong);
+    }
+
+    td.quality {
+      text-transform: lowercase;
+    }
+
+    td.roman {
+      font-family: "SF Mono", ui-monospace, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 0.75rem;
+      letter-spacing: 0.02em;
+      color: var(--accent);
+    }
+
+    .selected-chord-summary {
+      margin-top: 6px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .selected-chord-summary span.name {
+      color: var(--accent-strong);
+      font-weight: 500;
+    }
+
+    /* Progressions */
+    .progression-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .progression-buttons button {
+      border-radius: var(--radius-pill);
+      border: 1px solid var(--border-subtle);
+      background: rgba(15, 23, 42, 0.9);
+      color: var(--text-muted);
+      font-size: 0.78rem;
+      padding: 4px 10px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+    }
+
+    .progression-buttons button span.label {
+      font-weight: 500;
+      color: var(--accent);
+    }
+
+    .progression-buttons button:hover {
+      border-color: rgba(56, 189, 248, 0.8);
+      color: var(--text-main);
+      transform: translateY(-1px);
+    }
+
+    .progression-display {
+      margin-top: 8px;
+    }
+
+    .progression-note {
+      font-size: 0.76rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    @media (max-width: 900px) {
+      .grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>
+        Major Scale & Chord Visualiser
+        <span class="label">Interactive</span>
+      </h1>
+      <p class="subtitle">
+        Pick a key and see the major scale, the diatonic triads (I, ii, iii, IV, V, vi, vii°),
+        and how each chord lights up the 2-octave keyboard.
+      </p>
+    </header>
+
+    <section class="panel">
+      <div class="controls-row">
+        <div class="field">
+          <label for="keySelect">Key (major):</label>
+          <div class="select-box">
+            <select id="keySelect"></select>
+          </div>
+        </div>
+        <button class="reset-btn" id="resetChordBtn" type="button">
+          <span class="icon">✧</span>
+          Clear chord highlight
+        </button>
+      </div>
+
+      <div class="grid">
+        <!-- Left: Scale and keyboard -->
+        <div>
+          <h2>
+            Scale notes
+            <span class="tag">T–T–S–T–T–T–S</span>
+          </h2>
+          <p class="helper">
+            These are the 7 notes of the major scale in your chosen key (degrees 1–7),
+            spelled with correct sharps/flats for that key.
+          </p>
+          <div id="scalePills" class="pill-row"></div>
+
+          <div class="keyboard-wrapper">
+            <h2>
+              2-octave keyboard
+              <span class="tag">Scale & chord</span>
+            </h2>
+            <p class="helper">
+              Blue = in the key, gold = notes of the selected chord, red outline = root of the key.
+            </p>
+            <div id="keyboard" class="keyboard"></div>
+            <div class="legend">
+              <span class="legend-box">
+                <span class="legend-swatch scale"></span> Scale notes
+              </span>
+              <span class="legend-box">
+                <span class="legend-swatch chord"></span> Selected chord
+              </span>
+              <span class="legend-box">
+                <span class="legend-swatch root"></span> Key root
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: chords and progressions -->
+        <div>
+          <div>
+            <h2>
+              Chords in key
+              <span class="tag">Triads 1–3–5</span>
+            </h2>
+            <p class="helper">
+              Click a row to highlight that chord on the keyboard.
+            </p>
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Roman</th>
+                  <th>Chord</th>
+                  <th>Quality</th>
+                  <th>Notes (1–3–5)</th>
+                </tr>
+              </thead>
+              <tbody id="chordTableBody"></tbody>
+            </table>
+            <div id="selectedChordSummary" class="selected-chord-summary"></div>
+          </div>
+
+          <div style="margin-top: 14px;">
+            <h2>
+              Common progressions
+              <span class="tag">I–IV–V / I–V–vi–IV</span>
+            </h2>
+            <p class="helper">
+              Choose a progression to see which chords it uses in this key. Click a pill to highlight that chord.
+            </p>
+            <div class="progression-buttons">
+              <button type="button" data-prog="I-IV-V">
+                <span class="label">I – IV – V</span>
+                <span>basic 3-chord</span>
+              </button>
+              <button type="button" data-prog="I-V-vi-IV">
+                <span class="label">I – V – vi – IV</span>
+                <span>pop</span>
+              </button>
+              <button type="button" data-prog="ii-V-I">
+                <span class="label">ii – V – I</span>
+                <span>turnaround</span>
+              </button>
+            </div>
+            <div id="progressionDisplay" class="progression-display">
+              <div class="pill-row" id="progressionPills"></div>
+              <div id="progressionNote" class="progression-note"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    // 1. Pitch-class naming: sharps vs flats, plus a map from name -> index (0–11)
+    const SHARPS = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+    const FLATS  = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
+
+    // Keys that normally use flat spellings in their key signature
+    const USE_FLATS = ["F", "Bb", "Eb", "Ab", "Db", "Gb", "Cb"];
+
+    // Note name -> pitch-class index
+    const NOTE_INDEX = {
+      "C": 0,  "B#": 0,
+      "C#": 1, "Db": 1,
+      "D": 2,
+      "D#": 3, "Eb": 3,
+      "E": 4,  "Fb": 4,
+      "F": 5,  "E#": 5,
+      "F#": 6, "Gb": 6,
+      "G": 7,
+      "G#": 8, "Ab": 8,
+      "A": 9,
+      "A#": 10, "Bb": 10,
+      "B": 11, "Cb": 11
+    };
+
+    // Major keys we expose in the dropdown
+    // (12 pitch classes, with conventional sharp/flat spellings)
+    const MAJOR_KEYS = [
+      "C",
+      "G", "D", "A", "E", "B", "F#",
+      "Db", "Ab", "Eb", "Bb", "F"
+    ];
+
+    // Major scale pattern T–T–S–T–T–T–S
+    const MAJOR_STEPS = [2, 2, 1, 2, 2, 2, 1];
+
+    const DEGREE_ROMAN = ["I", "ii", "iii", "IV", "V", "vi", "vii°"];
+    const DEGREE_QUALITIES = ["major", "minor", "minor", "major", "major", "minor", "diminished"];
+
+    const state = {
+      keyRoot: "C",
+      rootIndex: 0,
+      useFlats: false,
+      scaleIndices: [], // [pc, ...]
+      scaleNames: [],   // ["C", "D", ...]
+      chords: [],       // chord objects
+      selectedChordIndex: null
+    };
+
+    // Build major scale indices + names for a given root, taking into account sharps/flats usage
+    function buildMajorScale(root) {
+      const rootIndex = NOTE_INDEX[root];
+      if (rootIndex == null) {
+        return { indices: [], names: [], useFlats: false };
+      }
+
+      const useFlats = USE_FLATS.includes(root);
+      const namingSet = useFlats ? FLATS : SHARPS;
+
+      const indices = [rootIndex];
+      const names = [root]; // preserve root spelling exactly as chosen
+
+      let currentIndex = rootIndex;
+      // Only need 6 steps to get 7 unique scale degrees (1–7)
+      for (let i = 0; i < MAJOR_STEPS.length - 1; i++) {
+        currentIndex = (currentIndex + MAJOR_STEPS[i]) % 12;
+        indices.push(currentIndex);
+        names.push(namingSet[currentIndex]);
+      }
+
+      return { indices, names, useFlats };
+    }
+
+    // Build 7 diatonic triads for a major scale
+    function buildDiatonicChords(scaleIndices, scaleNames) {
+      if (!scaleIndices || scaleIndices.length !== 7) return [];
+
+      const chords = [];
+
+      for (let degree = 0; degree < 7; degree++) {
+        const rootPc = scaleIndices[degree];
+        const thirdPc = scaleIndices[(degree + 2) % 7];
+        const fifthPc = scaleIndices[(degree + 4) % 7];
+
+        const rootName = scaleNames[degree];
+        const thirdName = scaleNames[(degree + 2) % 7];
+        const fifthName = scaleNames[(degree + 4) % 7];
+
+        const quality = DEGREE_QUALITIES[degree];
+        const roman = DEGREE_ROMAN[degree];
+
+        let suffix = "";
+        if (quality === "minor") suffix = "m";
+        if (quality === "diminished") suffix = "°";
+
+        chords.push({
+          degree: degree + 1,
+          roman,
+          quality,
+          name: rootName + suffix,
+          notes: [rootName, thirdName, fifthName],
+          pcs: [rootPc, thirdPc, fifthPc]
+        });
+      }
+
+      return chords;
+    }
+
+    // Render key dropdown
+    function renderKeySelect() {
+      const select = document.getElementById("keySelect");
+      select.innerHTML = "";
+      MAJOR_KEYS.forEach((key) => {
+        const opt = document.createElement("option");
+        opt.value = key;
+        opt.textContent = key + " major";
+        if (key === state.keyRoot) opt.selected = true;
+        select.appendChild(opt);
+      });
+    }
+
+    // Render scale pills
+    function renderScalePills() {
+      const container = document.getElementById("scalePills");
+      container.innerHTML = "";
+
+      state.scaleNames.forEach((note, idx) => {
+        const pill = document.createElement("div");
+        pill.className = "pill";
+        const degree = idx + 1;
+        pill.innerHTML = `<span>${note}</span><span class="sub">${degree}</span>`;
+        container.appendChild(pill);
+      });
+    }
+
+    // Build 2-octave keyboard based on current key spelling (sharps vs flats)
+    function buildKeyboard() {
+      const keyboard = document.getElementById("keyboard");
+      keyboard.innerHTML = "";
+
+      const namingSet = state.useFlats ? FLATS : SHARPS;
+
+      for (let i = 0; i < 24; i++) {
+        const pcIndex = i % 12;
+        const noteName = namingSet[pcIndex];
+
+        const key = document.createElement("div");
+        key.className = "key";
+        key.dataset.pc = pcIndex.toString();
+        key.innerHTML = `
+          <div class="note">${noteName}</div>
+          <div class="degree-label"></div>
+        `;
+        keyboard.appendChild(key);
+      }
+    }
+
+    // Update keyboard highlighting for scale & selected chord
+    function updateKeyboardHighlighting() {
+      const keys = document.querySelectorAll(".key");
+      const rootIndex = state.rootIndex;
+      const scaleIndices = state.scaleIndices;
+      const selectedChord =
+        state.selectedChordIndex != null ? state.chords[state.selectedChordIndex] : null;
+
+      keys.forEach((keyEl) => {
+        const pcIndex = parseInt(keyEl.dataset.pc, 10);
+        const degreeLabel = keyEl.querySelector(".degree-label");
+
+        keyEl.classList.remove("in-scale", "chord-note", "root-note");
+        degreeLabel.textContent = "";
+
+        // Root of key
+        if (pcIndex === rootIndex) {
+          keyEl.classList.add("root-note");
+        }
+
+        // In scale?
+        const idxInScale = scaleIndices.indexOf(pcIndex);
+        if (idxInScale !== -1) {
+          keyEl.classList.add("in-scale");
+          degreeLabel.textContent = "deg " + (idxInScale + 1);
+        }
+
+        // In selected chord?
+        if (selectedChord && selectedChord.pcs.includes(pcIndex)) {
+          keyEl.classList.add("chord-note");
+        }
+      });
+    }
+
+    // Render chord table
+    function renderChordTable() {
+      const tbody = document.getElementById("chordTableBody");
+      tbody.innerHTML = "";
+
+      state.chords.forEach((chord, idx) => {
+        const tr = document.createElement("tr");
+        tr.dataset.index = idx.toString();
+
+        const degTd = document.createElement("td");
+        degTd.textContent = chord.degree;
+
+        const romanTd = document.createElement("td");
+        romanTd.className = "roman";
+        romanTd.textContent = chord.roman;
+
+        const nameTd = document.createElement("td");
+        nameTd.textContent = chord.name;
+
+        const qualityTd = document.createElement("td");
+        qualityTd.className = "quality";
+        qualityTd.textContent = chord.quality;
+
+        const notesTd = document.createElement("td");
+        notesTd.textContent = chord.notes.join(" – ");
+
+        tr.appendChild(degTd);
+        tr.appendChild(romanTd);
+        tr.appendChild(nameTd);
+        tr.appendChild(qualityTd);
+        tr.appendChild(notesTd);
+
+        tr.addEventListener("click", () => {
+          selectChord(idx);
+        });
+
+        tbody.appendChild(tr);
+      });
+
+      updateChordRowSelection();
+    }
+
+    // Update selected chord row + explanation
+    function updateChordRowSelection() {
+      const rows = document.querySelectorAll("#chordTableBody tr");
+      rows.forEach((row) => row.classList.remove("selected-row"));
+
+      const summary = document.getElementById("selectedChordSummary");
+      summary.textContent = "";
+
+      if (state.selectedChordIndex == null) return;
+
+      const activeRow = document.querySelector(
+        `#chordTableBody tr[data-index="${state.selectedChordIndex}"]`
+      );
+      if (activeRow) {
+        activeRow.classList.add("selected-row");
+      }
+
+      const chord = state.chords[state.selectedChordIndex];
+      summary.innerHTML = `
+        Selected chord:
+        <span class="name">${chord.name}</span>
+        (<span>${chord.roman}</span>, degree ${chord.degree}) – notes:
+        ${chord.notes.join(" – ")}.
+      `;
+
+      // Extra teaching hint for vii° (leading-tone diminished chord)
+      if (chord.degree === 7 && chord.quality === "diminished") {
+        summary.innerHTML +=
+          " This is the leading-tone diminished chord: it's the only diatonic triad in a major key that contains a tritone, so it feels very unstable and wants to resolve back to I.";
+      }
+    }
+
+    // Select / deselect chord
+    function selectChord(idx) {
+      if (idx === state.selectedChordIndex) {
+        state.selectedChordIndex = null;
+      } else {
+        state.selectedChordIndex = idx;
+      }
+      updateChordRowSelection();
+      updateKeyboardHighlighting();
+    }
+
+    function clearChordSelection() {
+      state.selectedChordIndex = null;
+      updateChordRowSelection();
+      updateKeyboardHighlighting();
+    }
+
+    // Roman numeral -> degree index (0-based)
+    function romanToDegreeIndex(romanRaw) {
+      const cleaned = romanRaw.toLowerCase().replace(/[^iv]/g, "");
+      switch (cleaned) {
+        case "i": return 0;
+        case "ii": return 1;
+        case "iii": return 2;
+        case "iv": return 3;
+        case "v": return 4;
+        case "vi": return 5;
+        case "vii": return 6;
+        default: return -1;
+      }
+    }
+
+    function setupProgressionButtons() {
+      const buttons = document.querySelectorAll(".progression-buttons button");
+      buttons.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const prog = btn.dataset.prog;
+          showProgression(prog);
+        });
+      });
+    }
+
+    function showProgression(progStr) {
+      const pillsContainer = document.getElementById("progressionPills");
+      const noteEl = document.getElementById("progressionNote");
+      pillsContainer.innerHTML = "";
+      noteEl.textContent = "";
+
+      const parts = progStr.split(/[-–—]/).map(p => p.trim()).filter(Boolean);
+      const items = [];
+
+      parts.forEach((roman) => {
+        const idx = romanToDegreeIndex(roman);
+        if (idx >= 0 && idx < state.chords.length) {
+          const chord = state.chords[idx];
+          items.push({ roman, idx, chord });
+        }
+      });
+
+      if (items.length === 0) {
+        noteEl.textContent = "Progression not available in this key.";
+        return;
+      }
+
+      items.forEach(({ roman, idx, chord }) => {
+        const pill = document.createElement("div");
+        pill.className = "pill chord-pill";
+        pill.innerHTML = `
+          <span>${roman}</span>
+          <span class="sub">${chord.name}</span>
+        `;
+        pill.addEventListener("click", () => {
+          selectChord(idx);
+        });
+        pillsContainer.appendChild(pill);
+      });
+
+      const romanDisplay = items.map(i => i.roman).join(" – ");
+      const chordNames = items.map(i => i.chord.name).join(" → ");
+      noteEl.textContent = `${state.keyRoot} major – ${romanDisplay} uses chords: ${chordNames}.`;
+    }
+
+    // Change key, rebuild everything
+    function setKey(root) {
+      const scaleData = buildMajorScale(root);
+      if (!scaleData.indices.length) return;
+
+      state.keyRoot = root;
+      state.rootIndex = NOTE_INDEX[root];
+      state.useFlats = scaleData.useFlats;
+      state.scaleIndices = scaleData.indices;
+      state.scaleNames = scaleData.names;
+      state.chords = buildDiatonicChords(scaleData.indices, scaleData.names);
+      state.selectedChordIndex = null;
+
+      renderScalePills();
+      buildKeyboard();
+      renderChordTable();
+      updateKeyboardHighlighting();
+
+      // Clear progression display
+      document.getElementById("progressionPills").innerHTML = "";
+      document.getElementById("progressionNote").textContent = "";
+    }
+
+    // Initialise app
+    document.addEventListener("DOMContentLoaded", () => {
+      renderKeySelect();
+      setupProgressionButtons();
+
+      const keySelect = document.getElementById("keySelect");
+      keySelect.addEventListener("change", (e) => {
+        setKey(e.target.value);
+      });
+
+      document.getElementById("resetChordBtn").addEventListener("click", clearChordSelection);
+
+      // Default key
+      setKey("C");
+    });
+  </script>
+</body>
+</html>
